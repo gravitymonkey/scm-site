@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="$site_lang" class="no-js">
+  <head>
+    <title>$page_title</title>
+    <meta name="description" content="$meta_description">
+    <meta name="robots" content="index,follow">
+    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Lora:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/site.css">
+    <meta name="twitter:card" content="$twitter_card">
+    <meta name="twitter:title" content="$page_title">
+    <meta name="twitter:description" content="$meta_description">
+    <meta property="og:url" content="$canonical_url">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="$page_title">
+    <meta property="og:description" content="$meta_description">
+$social_image
+$json_ld
+    <script>document.documentElement.classList.remove('no-js');</script>
+  </head>
+  <body>
+    <div class="viewport">
+      <div class="viewport-top">
+        <header class="site-head">
+          <div class="site-head-pattern" aria-hidden="true"></div>
+          <div class="container">
+            <div class="site-mast">
+              <div class="site-mast-right">
+                <span class="site-mast-tagline">$site_title</span>
+              </div>
+            </div>
+            <nav class="site-nav">
+              <div class="site-nav-left">
+                <a class="site-nav-item" href="/" aria-label="Home"$home_attr><span class="material-symbols-outlined" aria-hidden="true">home</span></a>
+                <a class="site-nav-item" href="/about/" aria-label="About"$about_attr><span class="material-symbols-outlined" aria-hidden="true">info</span></a>
+              </div>
+            </nav>
+          </div>
+        </header>
+        <main class="site-main">
+          <div class="container">
+$main_content
+          </div>
+        </main>
+      </div>
+      <div class="viewport-bottom">
+        <footer class="site-foot">
+          <div class="site-foot-pattern" aria-hidden="true"></div>
+          <div class="site-foot-nav container">
+            <div class="site-foot-nav-center">
+              <span class="material-symbols-outlined" aria-hidden="true">license</span>
+              <a class="site-foot-nav-item" href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener noreferrer">CC BY-NC 4.0</a>
+              <a class="site-foot-nav-item" href="$source_url" target="_blank" rel="noopener noreferrer"><span class="material-symbols-outlined" aria-hidden="true">settings</span> View Source</a>
+              <a class="site-foot-nav-item" href="$author_url" target="_blank" rel="noopener noreferrer"><span class="material-symbols-outlined" aria-hidden="true">attribution</span> $author_name</a>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+  </body>
+</html>
