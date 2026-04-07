@@ -3,6 +3,8 @@ import html
 import json
 import re
 import shutil
+import struct
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from string import Template
@@ -17,6 +19,17 @@ CONTENT = ROOT / "content"
 TEMPLATES = ROOT / "templates"
 STATIC = ROOT / "static"
 DIST = ROOT / "dist"
+
+IMAGE_PRESETS = {
+    "feature": {"max_width": 1400, "quality": 70},
+    "inline": {"max_width": 1200, "quality": 72},
+    "tile": {"max_width": 220, "quality": 45},
+}
+FEATURE_VARIANT_WIDTHS = (480, 800, 1200, 1400)
+CARD_IMAGE_SIZES = "(max-width: 680px) 92vw, (max-width: 980px) 44vw, 30vw"
+HERO_IMAGE_SIZES = "(max-width: 760px) 92vw, 680px"
+IMAGE_DERIVATIVE_CACHE = {}
+DERIVATIVE_SOURCE_URLS = set()
 
 
 def load_yaml(path):
@@ -80,6 +93,178 @@ def html_attr(value):
     return html.escape(value or "", quote=True)
 
 
+def local_asset_path(url_path):
+    if not url_path or not url_path.startswith("/assets/"):
+        return None
+    return STATIC / url_path.lstrip("/")
+
+
+def built_asset_path(url_path):
+    if not url_path or not url_path.startswith("/assets/"):
+        return None
+    return DIST / url_path.lstrip("/")
+
+
+def site_asset_path(url_path):
+    built_path = built_asset_path(url_path)
+    if built_path and built_path.exists():
+        return built_path
+
+    static_path = local_asset_path(url_path)
+    if static_path and static_path.exists():
+        return static_path
+
+    return None
+
+
+def image_size_for_site_path(url_path):
+    file_path = site_asset_path(url_path)
+    if not file_path or not file_path.exists():
+        return None
+
+    with file_path.open("rb") as handle:
+        header = handle.read(32)
+        if header.startswith(b"\x89PNG\r\n\x1a\n") and len(header) >= 24:
+            return struct.unpack(">II", header[16:24])
+
+        if header[:2] == b"\xff\xd8":
+            handle.seek(2)
+            while True:
+                marker_prefix = handle.read(1)
+                if not marker_prefix:
+                    return None
+                if marker_prefix != b"\xff":
+                    continue
+                marker = handle.read(1)
+                while marker == b"\xff":
+                    marker = handle.read(1)
+                if marker in {b"\xc0", b"\xc1", b"\xc2", b"\xc3", b"\xc5", b"\xc6", b"\xc7", b"\xc9", b"\xca", b"\xcb", b"\xcd", b"\xce", b"\xcf"}:
+                    segment_length = struct.unpack(">H", handle.read(2))[0]
+                    segment = handle.read(segment_length - 2)
+                    height, width = struct.unpack(">HH", segment[1:5])
+                    return width, height
+                if marker in {b"\xd8", b"\xd9"}:
+                    continue
+                segment_length_bytes = handle.read(2)
+                if len(segment_length_bytes) != 2:
+                    return None
+                segment_length = struct.unpack(">H", segment_length_bytes)[0]
+                handle.seek(segment_length - 2, 1)
+
+    return None
+
+
+def image_dimension_attrs(url_path):
+    size = image_size_for_site_path(url_path)
+    if not size:
+        return ""
+    width, height = size
+    return ' width="%s" height="%s"' % (width, height)
+
+
+def derivative_url(url_path, preset, *, width=None):
+    source = Path(url_path)
+    config = IMAGE_PRESETS[preset]
+    ext = ".jpg"
+    return "/assets/images/%s.%s-%sw%s" % (
+        source.stem,
+        preset,
+        width or config["max_width"],
+        ext,
+    )
+
+
+def ensure_image_derivative(url_path, preset, *, width=None):
+    if not url_path or not url_path.startswith("/assets/"):
+        return url_path
+    if ".%s." % preset in url_path:
+        return url_path
+
+    cache_key = (url_path, preset, width)
+    if cache_key in IMAGE_DERIVATIVE_CACHE:
+        return IMAGE_DERIVATIVE_CACHE[cache_key]
+
+    source_path = local_asset_path(url_path)
+    if not source_path or not source_path.exists():
+        IMAGE_DERIVATIVE_CACHE[cache_key] = url_path
+        return url_path
+
+    target_url = derivative_url(url_path, preset, width=width)
+    target_path = built_asset_path(target_url)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not target_path.exists() or source_path.stat().st_mtime > target_path.stat().st_mtime:
+        config = IMAGE_PRESETS[preset]
+        command = ["sips", "-Z", str(width or config["max_width"])]
+        if target_path.suffix.lower() in {".jpg", ".jpeg"}:
+            command.extend(["-s", "format", "jpeg", "-s", "formatOptions", str(config["quality"])])
+        else:
+            command.extend(["-s", "format", "png"])
+        command.extend([str(source_path), "--out", str(target_path)])
+        subprocess.run(command, check=True, capture_output=True)
+
+    DERIVATIVE_SOURCE_URLS.add(url_path)
+    IMAGE_DERIVATIVE_CACHE[cache_key] = target_url
+    return target_url
+
+
+def ensure_image_variant_set(url_path, preset, widths):
+    variants = []
+    for width in widths:
+        variants.append(
+            {
+                "width": width,
+                "url": ensure_image_derivative(url_path, preset, width=width),
+            }
+        )
+    return variants
+
+
+def srcset_attr(variants):
+    return ", ".join("%s %sw" % (variant["url"], variant["width"]) for variant in variants)
+
+
+def optimize_html_img_tag(match):
+    tag = match.group(0)
+    source_url = match.group(1)
+    optimized_url = ensure_image_derivative(source_url, "inline")
+    updated = tag.replace(source_url, optimized_url, 1)
+    dims = image_dimension_attrs(optimized_url)
+    if dims and " width=" not in updated and " height=" not in updated:
+        updated = updated[:-1] + dims + ">"
+    if "loading=" not in updated:
+        updated = updated[:-1] + ' loading="lazy">'
+    if "decoding=" not in updated:
+        updated = updated[:-1] + ' decoding="async">'
+    return updated
+
+
+def preprocess_markdown(markdown_text):
+    return re.sub(r'<img\b[^>]*\bsrc="([^"]+)"[^>]*>', optimize_html_img_tag, markdown_text)
+
+
+def image_tag(url_path, alt, *, class_name="", loading="lazy", fetchpriority=None, decoding="async", srcset=None, sizes=None):
+    attrs = [
+        'src="%s"' % html_attr(url_path),
+        'alt="%s"' % html_attr(alt),
+    ]
+    if class_name:
+        attrs.append('class="%s"' % html_attr(class_name))
+    attrs.append('loading="%s"' % html_attr(loading))
+    if fetchpriority:
+        attrs.append('fetchpriority="%s"' % html_attr(fetchpriority))
+    if decoding:
+        attrs.append('decoding="%s"' % html_attr(decoding))
+    if srcset:
+        attrs.append('srcset="%s"' % html_attr(srcset))
+    if sizes:
+        attrs.append('sizes="%s"' % html_attr(sizes))
+    dims = image_dimension_attrs(url_path)
+    if dims:
+        attrs.append(dims.strip())
+    return "<img %s>" % " ".join(attrs)
+
+
 def read_time_minutes(markdown_text):
     plain = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", markdown_text)
     plain = re.sub(r"\[[^\]]+\]\([^)]+\)", "", plain)
@@ -105,8 +290,18 @@ def apply_inline_markup(text):
 
     text = html.escape(text)
     text = re.sub(r"`([^`]+)`", store_code, text)
-    text = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", r'<img src="\2" alt="\1">', text)
-    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', text)
+
+    def replace_image(match):
+        alt, src = match.groups()
+        optimized_url = ensure_image_derivative(src, "inline")
+        return image_tag(optimized_url, alt, loading="lazy")
+
+    def replace_link(match):
+        label, href = match.groups()
+        return '<a href="%s">%s</a>' % (href, label)
+
+    text = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", replace_image, text)
+    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", replace_link, text)
     text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"__([^_]+)__", r"<strong>\1</strong>", text)
     text = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<em>\1</em>", text)
@@ -117,6 +312,7 @@ def apply_inline_markup(text):
 
 
 def render_markdown(markdown_text):
+    markdown_text = preprocess_markdown(markdown_text)
     blocks = []
     current = []
     in_code = False
@@ -176,10 +372,7 @@ def render_markdown(markdown_text):
         image_only = re.match(r"^!\[([^\]]*)\]\(([^)]+)\)$", first)
         if image_only and len(lines) == 1:
             alt, src = image_only.groups()
-            rendered.append(
-                '<figure class="kg-card kg-image-card"><img src="%s" class="kg-image" alt="%s" loading="lazy"></figure>'
-                % (html_attr(src), html_attr(alt))
-            )
+            rendered.append('<figure class="kg-card kg-image-card">%s</figure>' % image_tag(ensure_image_derivative(src, "inline"), alt, class_name="kg-image", loading="lazy"))
             continue
 
         if all(re.match(r"^[-*]\s+", line.strip()) for line in lines):
@@ -203,14 +396,20 @@ def render_markdown(markdown_text):
     return "".join(rendered)
 
 
-def render_card(post, tags_by_slug):
+def render_card(post, tags_by_slug, *, is_priority=False):
     tag_names = [tags_by_slug[tag]["name"] for tag in post.get("tags", []) if tag in tags_by_slug]
     tag_html = html.escape(", ".join(tag_names))
     image_html = ""
     if post.get("feature_image"):
-        image_html = '<img class="post-card-image" src="%s" alt="%s" loading="lazy">' % (
-            html_attr(post["feature_image"]),
-            html_attr(post["title"]),
+        feature_srcset = srcset_attr(post["feature_image_variants"])
+        image_html = image_tag(
+            post["feature_image_optimized"],
+            post["title"],
+            class_name="post-card-image",
+            loading="eager" if is_priority else "lazy",
+            fetchpriority="high" if is_priority else None,
+            srcset=feature_srcset,
+            sizes=CARD_IMAGE_SIZES,
         )
     return (
         '<a class="post-card" href="{url}"><header class="post-card-header">{image}'
@@ -229,7 +428,20 @@ def render_card(post, tags_by_slug):
     )
 
 
-def build_page_shell(site, *, title, description, path, content_html, canonical_url, og_image="", twitter_card="summary_large_image", json_ld=""):
+def build_page_shell(
+    site,
+    *,
+    title,
+    description,
+    path,
+    content_html,
+    canonical_url,
+    og_image="",
+    twitter_card="summary_large_image",
+    json_ld="",
+    og_type="website",
+    robots_content="index,follow",
+):
     template = load_template("base.html")
     home_attr = ' aria-current="page"' if path == "/" else ""
     about_attr = ' aria-current="page"' if path == "/about/" else ""
@@ -249,6 +461,8 @@ def build_page_shell(site, *, title, description, path, content_html, canonical_
         site_lang=html_attr(site.get("lang", "en")),
         canonical_url=html_attr(canonical_url),
         twitter_card=html_attr(twitter_card),
+        og_type=html_attr(og_type),
+        robots_content=html_attr(robots_content),
         social_image=social_image,
         page_heading=html.escape(title),
         main_content=content_html,
@@ -271,6 +485,7 @@ def main():
     if DIST.exists():
         shutil.rmtree(DIST)
     shutil.copytree(STATIC / "assets", DIST / "assets")
+    ensure_image_derivative("/assets/images/confused_small.png", "tile")
 
     site = load_yaml(CONTENT / "site.yml")
     tags_by_slug = load_yaml(CONTENT / "tags.yml")
@@ -292,6 +507,8 @@ def main():
         page["updated_at"] = parse_date(page.get("updated")) or page["published_at"]
         page["excerpt"] = page.get("excerpt") or excerpt_from_markdown(page["body_markdown"])
         page["content_html"] = render_markdown(page["body_markdown"])
+        page["feature_image_variants"] = ensure_image_variant_set(page.get("feature_image"), "feature", FEATURE_VARIANT_WIDTHS) if page.get("feature_image") else []
+        page["feature_image_optimized"] = page["feature_image_variants"][-1]["url"] if page["feature_image_variants"] else ""
         page["kind"] = "page"
         pages.append(page)
 
@@ -306,20 +523,29 @@ def main():
         post["excerpt"] = post.get("excerpt") or excerpt_from_markdown(post["body_markdown"])
         post["reading_time"] = read_time_minutes(post["body_markdown"])
         post["content_html"] = render_markdown(post["body_markdown"])
+        post["feature_image_variants"] = ensure_image_variant_set(post.get("feature_image"), "feature", FEATURE_VARIANT_WIDTHS) if post.get("feature_image") else []
+        post["feature_image_optimized"] = post["feature_image_variants"][-1]["url"] if post["feature_image_variants"] else ""
         post["kind"] = "post"
         posts.append(post)
 
     posts.sort(key=lambda item: item["updated_at"], reverse=True)
 
-    home_cards = "".join(render_card(post, tags_by_slug) for post in posts)
+    home_cards = "".join(render_card(post, tags_by_slug, is_priority=(index == 0)) for index, post in enumerate(posts))
     home_content = load_template("home.html").safe_substitute(cards=home_cards)
     home_json_ld = '<script type="application/ld+json">%s</script>' % json.dumps(
         {
             "@context": "https://schema.org",
             "@type": "WebSite",
+            "@id": absolute_url(site, "/#website"),
             "name": site["title"],
             "url": site["url"],
             "description": site["description"],
+            "publisher": {
+                "@type": "Person",
+                "@id": absolute_url(site, "/#publisher"),
+                "name": site["author_name"],
+                "url": site["author_url"],
+            },
         },
         indent=2,
     )
@@ -331,9 +557,9 @@ def main():
             description=site["description"],
             path="/",
             content_html=home_content,
-            canonical_url=absolute_url(site, "/"),
-            json_ld=home_json_ld,
-        ),
+                canonical_url=absolute_url(site, "/"),
+                json_ld=home_json_ld,
+            ),
     )
 
     all_public_urls = ["/"]
@@ -344,9 +570,13 @@ def main():
     for page in pages:
         feature_image_html = ""
         if page.get("feature_image"):
-            feature_image_html = '<figure class="post-feature-image"><img src="%s" alt="%s" loading="lazy"></figure>' % (
-                html_attr(page["feature_image"]),
-                html_attr(page["title"]),
+            feature_image_html = '<figure class="post-feature-image">%s</figure>' % image_tag(
+                page["feature_image_optimized"],
+                page["title"],
+                loading="eager",
+                fetchpriority="high",
+                srcset=srcset_attr(page["feature_image_variants"]),
+                sizes=HERO_IMAGE_SIZES,
             )
         body = page_template.safe_substitute(
             feature_image=feature_image_html,
@@ -358,10 +588,12 @@ def main():
             {
                 "@context": "https://schema.org",
                 "@type": schema_type,
+                "@id": absolute_url(site, page["url"]) + "#webpage",
                 "name": page["title"],
                 "headline": page["title"],
                 "description": page["excerpt"],
                 "url": absolute_url(site, page["url"]),
+                "isPartOf": {"@id": absolute_url(site, "/#website")},
                 "datePublished": isoformat(page["published_at"]),
                 "dateModified": isoformat(page["updated_at"]),
                 "author": {
@@ -385,6 +617,7 @@ def main():
                 content_html=body,
                 canonical_url=absolute_url(site, page["url"]),
                 json_ld=json_ld,
+                robots_content="noindex,follow" if page["url"] == "/404.html" else "index,follow",
             ),
         )
         if not page.get("exclude_from_sitemap"):
@@ -393,9 +626,13 @@ def main():
     for post in posts:
         feature_image_html = ""
         if post.get("feature_image"):
-            feature_image_html = '<figure class="post-feature-image"><img src="%s" alt="%s" loading="lazy"></figure>' % (
-                html_attr(post["feature_image"]),
-                html_attr(post["title"]),
+            feature_image_html = '<figure class="post-feature-image">%s</figure>' % image_tag(
+                post["feature_image_optimized"],
+                post["title"],
+                loading="eager",
+                fetchpriority="high",
+                srcset=srcset_attr(post["feature_image_variants"]),
+                sizes=HERO_IMAGE_SIZES,
             )
         body = post_template.safe_substitute(
             feature_image=feature_image_html,
@@ -406,17 +643,25 @@ def main():
             {
                 "@context": "https://schema.org",
                 "@type": "BlogPosting",
+                "@id": absolute_url(site, post["url"]) + "#article",
                 "headline": post["title"],
                 "description": post["excerpt"],
                 "url": absolute_url(site, post["url"]),
                 "mainEntityOfPage": absolute_url(site, post["url"]),
+                "isPartOf": {"@id": absolute_url(site, "/#website")},
                 "datePublished": isoformat(post["published_at"]),
                 "dateModified": isoformat(post["updated_at"]),
-                "image": [absolute_url(site, post["feature_image"])] if post.get("feature_image") else [],
+                "image": [absolute_url(site, post["feature_image_optimized"])] if post.get("feature_image") else [],
                 "author": {
                     "@type": "Person",
                     "name": post["author"]["name"],
                     "url": absolute_url(site, post["author"]["url"]),
+                },
+                "publisher": {
+                    "@type": "Person",
+                    "@id": absolute_url(site, "/#publisher"),
+                    "name": site["author_name"],
+                    "url": site["author_url"],
                 },
             },
             indent=2,
@@ -430,8 +675,9 @@ def main():
                 path=post["url"],
                 content_html=body,
                 canonical_url=absolute_url(site, post["url"]),
-                og_image=absolute_url(site, post["feature_image"]) if post.get("feature_image") else "",
+                og_image=absolute_url(site, post["feature_image_optimized"]) if post.get("feature_image") else "",
                 json_ld=json_ld,
+                og_type="article",
             ),
         )
         all_public_urls.append(post["url"])
@@ -454,9 +700,11 @@ def main():
             {
                 "@context": "https://schema.org",
                 "@type": "CollectionPage",
+                "@id": absolute_url(site, path) + "#collection",
                 "name": tag["name"],
                 "description": tag.get("description", ""),
                 "url": absolute_url(site, path),
+                "isPartOf": {"@id": absolute_url(site, "/#website")},
             },
             indent=2,
         )
@@ -493,9 +741,11 @@ def main():
             {
                 "@context": "https://schema.org",
                 "@type": "ProfilePage",
+                "@id": absolute_url(site, author["url"]) + "#profile",
                 "name": author["name"],
                 "description": author.get("bio", ""),
                 "url": absolute_url(site, author["url"]),
+                "isPartOf": {"@id": absolute_url(site, "/#website")},
                 "mainEntity": {
                     "@type": "Person",
                     "name": author["name"],
@@ -571,8 +821,75 @@ def main():
     )
     write_output("sitemap.xml", sitemap)
 
-    write_output("robots.txt", "User-agent: *\nAllow: /\n")
-    write_output(".htaccess", "ErrorDocument 404 /404.html\n")
+    for special_file in ("_headers", "_redirects"):
+        special_file_path = CONTENT / special_file
+        if special_file_path.exists():
+            write_output(special_file, special_file_path.read_text())
+
+    for source_url in sorted(DERIVATIVE_SOURCE_URLS):
+        copied_source = built_asset_path(source_url)
+        if copied_source and copied_source.exists():
+            copied_source.unlink()
+
+    write_output("robots.txt", "User-agent: *\nAllow: /\nSitemap: %s\n" % absolute_url(site, "/sitemap.xml"))
+    llms_lines = [
+        "# %s" % site["title"],
+        "",
+        "> %s" % site["description"],
+        "",
+        "Site: %s" % site["url"],
+        "Author: %s" % site["author_name"],
+        "Author URL: %s" % site["author_url"],
+        "Source: %s" % site["source_url"],
+        "Sitemap: %s" % absolute_url(site, "/sitemap.xml"),
+        "Feed: %s" % absolute_url(site, "/feed.xml"),
+        "",
+        "## Key Pages",
+        "- Home: %s" % absolute_url(site, "/"),
+    ]
+    for page in pages:
+        if page["url"] != "/404.html":
+            llms_lines.append("- %s: %s" % (page["title"], absolute_url(site, page["url"])))
+    llms_lines.extend(["", "## Posts"])
+    for post in posts:
+        llms_lines.append("- %s: %s" % (post["title"], absolute_url(site, post["url"])))
+    write_output("llms.txt", "\n".join(llms_lines) + "\n")
+    write_output(
+        ".htaccess",
+        """ErrorDocument 404 /404.html
+<IfModule mod_headers.c>
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; img-src 'self' https: data:; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'"
+  <FilesMatch "\\.(css|jpg|jpeg|png|gif|svg|webp|woff|woff2)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "\\.(html|xml|txt)$">
+    Header set Cache-Control "public, max-age=300"
+  </FilesMatch>
+</IfModule>
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml application/xml application/rss+xml application/javascript application/json image/svg+xml
+</IfModule>
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/html "access plus 5 minutes"
+  ExpiresByType text/plain "access plus 5 minutes"
+  ExpiresByType text/xml "access plus 5 minutes"
+  ExpiresByType application/xml "access plus 5 minutes"
+  ExpiresByType application/rss+xml "access plus 5 minutes"
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+""",
+    )
 
 
 if __name__ == "__main__":

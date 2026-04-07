@@ -85,6 +85,25 @@ This writes:
 flat-site-dist.tar.gz
 ```
 
+## Image Pipeline
+
+Local content images can stay in `static/assets/images/` as source files.
+
+During `python3 build.py`, the generator now creates optimized derivatives in `dist/assets/images/` for:
+
+- post and page feature images
+- Markdown image embeds
+- raw local `<img>` tags inside Markdown
+- the repeated header/footer background tile
+
+Current presets:
+
+- feature images: resized to a max width of `1400px`
+- inline content images: resized to a max width of `1200px`
+- background tile: resized to a max width of `220px`
+
+The built pages reference those generated derivatives automatically, and the original source files are omitted from `dist/` when a derivative replaces them.
+
 ## Content Workflow
 
 ### New post

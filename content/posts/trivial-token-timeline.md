@@ -39,9 +39,9 @@ Rodney, who actually has to build the thing, is sitting there nodding -- because
 
 Those decisions had weight. So we built an elaborate simulation layer to justify them. Six months of research and deep thinking -- which is a nice way to say polite fighting -- to arrive at something that felt like knowledge, a little like certainty, but mostly tasted like a leap of faith.
 
-It felt real.
+It felt real, right? And it wasn't nothing. It just wasn't what we thought it was.  The Mythical Man-Month was right about the cost of building, so we planned.
 
-And it wasn't nothing. It just wasn't what we thought it was.
+Now the cost of building has collapsed, so let's change how we plan.
 
 
 ## Plan in POCs
@@ -50,7 +50,7 @@ There is, of course, a very seductive version of this story now.
 
 It's Saturday morning. I have coffee, a slightly dangerous prompt, and just enough spite to prove everyone wrong. By lunch, something real exists. By dinner, I'm wondering why the company needed six months.
 
-But this is how bad decisions get made.  Because even if that prototype feels like an answer, it isn't. It's the question -- made visible.
+And as much as I love this lack of process as my new process, I would caution that overstating my new superpower is where bad decisions get made.  Because even if my Saturday prototype feels like an answer, it isn't. It's the question -- made visible.
 
 If you can replace some of that massive spec document with something real, you've done something important. You're no longer asking people to imagine the thing from a sketch of a sketch. You can point at it, you can touch it. You can argue about it, and you can break it. And you can improve it -- or kill it quickly and move on.
 
@@ -58,11 +58,11 @@ That's the Trivial Token Timeline -- where you can build anything quickly, but s
 
 That distinction matters.
 
-The organizations that figure this out won't skip the hard thinking. They'll just move it earlier and test it against reality instead of letting it sit unchallenged in a document that nobody ever updates again. 
+The organizations that figure this out won't skip the hard thinking.  User testing, market research, pricing strategies. They'll just move it earlier and test it against reality instead of letting it sit unchallenged in a document that nobody ever updates again. 
 
 For execs, the question changes from *"Are we confident enough to fund this?"* to *"What is the fastest thing we can build to find out if this is even the right question?"* That used to be impractical, as even a month-long prototype raised eyebrows: *"You're going to throw it away?"* finance would ask. *"Maybe?"* was my answer (But *"Hell, yes"* was my honest answer).
 
-Cheap code doesn't make decisions easier. It just makes them sooner.
+Cheap code doesn't make those strategic business decisions easier. It just makes them sooner.
 
 Now you can place a dozen bets in the time it used to take to approve one. But the bets still matter. Because selecting the right one -- understanding why it worked, why the others didn't, and what it actually means -- that part hasn't gone away, nor has it been solved by AI magic.
 
@@ -73,6 +73,6 @@ It's just been moved.
 
 The top of the statue is still there.
 
-Not buried in the sand -- just sitting in the room with you, every time we mistake a plan for the thing itself. You just don't need six months anymore. You need one or a dozen honest prototypes, and the willingness to throw them away.
+Not buried in the sand -- just sitting in the room with you, every time we mistake a plan for the thing itself. You don't need six months anymore. You need one or a dozen honest prototypes, and the willingness to throw them away.
 
-That part -- deciding what actually matters -- still isn't free.
+That part -- deciding what actually matters -- isn't free.
