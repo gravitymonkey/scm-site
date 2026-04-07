@@ -25,19 +25,17 @@ The Mythical Man-Month quietly became something else -- call it the Trivial Toke
 
 ## The Simulation We Called Planning
 
-Most of the upfront time in software planning was an expensive simulation layer -- which is a polite way of saying we were all sitting in conference rooms pretending a document was the product. I have personally watched four adults debate a wireframe as if it might begin moving if we believed hard enough. Someone asks if the button should be blue -- not because it matters yet, but because it's the only part we can actually see.
+Most of the upfront time in software planning was an expensive simulation layer -- which is a polite way of saying we were all sitting in conference rooms pretending a document was the product. I have personally watched four adults debate a wireframe as if it might turn itself into code if we believed hard enough. Someone asks if the button should be blue -- not because it matters yet, but because it's the only part we can actually see.
 
-None of this was superstition. It solved a real problem. Building software was expensive enough that you had to communicate the thing before you committed to making it.
-
-But only a small slice of those documents was actually answering questions.
+This planning solved a real problem: building software was expensive enough that you had to communicate the thing before you committed to making it. But only a small slice of those documents was actually answering questions.
 
 The rest was something else -- a codification of engineering beliefs and corporate culture, wrapped in a cloak of post-facto-failure ass-coverage.
 
 We weren't discovering the truth. We were rehearsing what we already believed, in slightly more formal language.
 
-Rodney, who actually has to build the thing, is sitting there nodding -- because disagreeing means another meeting, and agreeing means maybe we can start. And this wasn't about his tickets or sprints. This was the higher-order decision: *what do we fund, how do we staff, what do we show the board?*
+Rodney, who actually has to build the thing, is sitting there nodding -- because disagreeing means another meeting, and agreeing means maybe we can start. And this wasn't about their tickets or sprints. This dance, whether Rod was aware or not, was about the higher-order decision: *what do we fund, how do we staff, what do we show the board?*
 
-Those decisions had weight. So we built an elaborate simulation layer to justify them. Six months of research and deep thinking -- which is a nice way to say polite fighting -- to arrive at something that felt like knowledge, a little like certainty, but mostly tasted like a leap of faith.
+Those decisions had weight, and meaningful risk. So we built an elaborate simulation layer to justify them. Six months of research and deep thinking -- which is a nice way to say polite fighting -- to arrive at something that felt like knowledge, a little like certainty, but mostly tasted like a leap of faith.
 
 It felt real, right? And it wasn't nothing. It just wasn't what we thought it was.  The Mythical Man-Month was right about the cost of building, so we planned.
 
