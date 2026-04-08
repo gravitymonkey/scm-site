@@ -18,9 +18,9 @@ If you don't recall Brooks, his book [The Mythical Man-Month](https://en.wikiped
 
 And then, while we were still fussing about Jira tickets and arguing about headcount, the cost of building something dropped to a handful of tokens and a prompt just coherent enough to be dangerous. The prototype appeared before the argument finished.
 
-The myth stayed. The month stayed. Even the man stayed.
+The myth stayed. And the month stayed. And even the man stayed, for now.
 
-The Mythical Man-Month quietly became something else -- call it the Trivial Token Timeline -- where the cost of building collapses, but the cost of being wrong doesn't.
+But the Mythical Man-Month quietly became something else -- I'll rename it the Trivial Token Timeline -- where the cost of building collapses, but the cost of being wrong doesn't.
 
 
 ## The Simulation We Called Planning
@@ -37,7 +37,7 @@ Rodney, who actually has to build the thing, is sitting there nodding -- because
 
 Those decisions had weight, and meaningful risk. So we built an elaborate simulation layer to justify them. Six months of research and deep thinking -- which is a nice way to say polite fighting -- to arrive at something that felt like knowledge, a little like certainty, but mostly tasted like a leap of faith.
 
-It felt real, right? And it wasn't nothing. It just wasn't what we thought it was.  The Mythical Man-Month was right about the cost of building, so we planned.
+And it felt real, right? It wasn't nothing, as a task or as an expense. It just wasn't what we thought it was.  The Mythical Man-Month was always right about the cost of building, so we planned.
 
 Now the cost of building has collapsed, so let's change how we plan.
 
@@ -54,15 +54,15 @@ If you can replace some of that massive spec document with something real, you'v
 
 That's the Trivial Token Timeline -- where you can build anything quickly, but still have to decide what matters. Now that writing code is cheap, you can plan in prototypes -- but only if you're honest about what a prototype is. _It's a planning tool that happens to look like a product_. 
 
-That distinction matters.
+And that's a big freakin' distinction.
 
-The organizations that figure this out won't skip the hard thinking.  User testing, market research, pricing strategies. They'll just move it earlier and test it against reality instead of letting it sit unchallenged in a document that nobody ever updates again. 
+The organizations that figure this out won't skip the hard thinking.  The user testing, market research, pricing strategies -- all of that. They'll just move it earlier and test it against reality instead of letting it sit unchallenged in a document that nobody ever updates again. 
 
-For execs, the question changes from *"Are we confident enough to fund this?"* to *"What is the fastest thing we can build to find out if this is even the right question?"* That used to be impractical, as even a month-long prototype raised eyebrows: *"You're going to throw it away?"* finance would ask. *"Maybe?"* was my answer (But *"Hell, yes"* was my honest answer).
+For execs, the question changes from *"Are we confident enough to fund this?"* to *"What is the fastest thing we can build to find out if this is even the right question?"* (That used to be impractical, as even a month-long prototype raised eyebrows: *"You're going to throw it away?"* finance would ask. *"Maybe?"* was my response, but *"Hell, yes"* was my honest answer).
 
 Cheap code doesn't make those strategic business decisions easier. It just makes them sooner.
 
-Now you can place a dozen bets in the time it used to take to approve one. But the bets still matter. Because selecting the right one -- understanding why it worked, why the others didn't, and what it actually means -- that part hasn't gone away, nor has it been solved by AI magic.
+Now you can place a dozen bets in the time it used to take to approve one. But the bets still matter, even if they cost a lot less. Because selecting the right one -- understanding why it worked, why the others didn't, and what it actually means -- that part hasn't gone away, nor has it been solved by AI magic.
 
 It's just been moved.
 
@@ -71,6 +71,6 @@ It's just been moved.
 
 The top of the statue is still there.
 
-Not buried in the sand -- just sitting in the room with you, every time we mistake a plan for the thing itself. You don't need six months anymore. You need one or a dozen honest prototypes, and the willingness to throw them away.
+Not buried in the sand -- just sitting in the room with you, every time we mistake a plan for the thing itself. Now you don't need six months anymore, now you need one or a dozen honest prototypes, and the willingness to throw them away.
 
 That part -- deciding what actually matters -- isn't free.
