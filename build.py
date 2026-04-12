@@ -5,6 +5,7 @@ import re
 import shutil
 import struct
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from string import Template
@@ -411,9 +412,10 @@ def render_card(post, tags_by_slug, *, is_priority=False):
             srcset=feature_srcset,
             sizes=CARD_IMAGE_SIZES,
         )
+    draft_label = '<span class="post-card-draft">Draft</span> ' if post.get("draft") else ""
     return (
         '<a class="post-card" href="{url}"><header class="post-card-header">{image}'
-        '<div class="post-card-tags">{tags}</div><h2 class="post-card-title">{title}</h2>'
+        '<div class="post-card-tags">{tags}</div><h2 class="post-card-title">{draft}{title}</h2>'
         '</header><div class="post-card-excerpt"><p>{excerpt}</p></div><footer class="post-card-footer">'
         '<div class="post-card-footer-left"><span>Updated {updated}</span></div>'
         '<div class="post-card-footer-right"><div>{minutes} min read</div></div></footer></a>'
@@ -421,6 +423,7 @@ def render_card(post, tags_by_slug, *, is_priority=False):
         url=post["url"],
         image=image_html,
         tags=tag_html,
+        draft=draft_label,
         title=html.escape(post["title"]),
         excerpt=html.escape(post["excerpt"]),
         updated=human_date(post["updated_at"]),
@@ -482,6 +485,8 @@ def write_output(relative_path, content):
 
 
 def main():
+    include_drafts = "--drafts" in sys.argv
+
     if DIST.exists():
         shutil.rmtree(DIST)
     shutil.copytree(STATIC / "assets", DIST / "assets")
@@ -500,6 +505,9 @@ def main():
     pages = []
     for path in sorted((CONTENT / "pages").glob("*.md")):
         page = read_markdown_doc(path)
+        if page.get("draft") and not include_drafts:
+            print("[build] skipping draft: %s" % path.name)
+            continue
         page["slug"] = page.get("slug") or slugify(page["title"])
         page["url"] = page.get("url") or ("/%s/" % page["slug"] if page["slug"] != "404" else "/404.html")
         page["author"] = authors.get(page.get("author", ""))
@@ -515,6 +523,9 @@ def main():
     posts = []
     for path in sorted((CONTENT / "posts").glob("*.md")):
         post = read_markdown_doc(path)
+        if post.get("draft") and not include_drafts:
+            print("[build] skipping draft: %s" % path.name)
+            continue
         post["slug"] = post.get("slug") or slugify(post["title"])
         post["url"] = "/%s/" % post["slug"]
         post["author"] = authors[post["author"]]
@@ -578,10 +589,11 @@ def main():
                 srcset=srcset_attr(page["feature_image_variants"]),
                 sizes=HERO_IMAGE_SIZES,
             )
+        draft_banner = '<div class="draft-banner">DRAFT &mdash; not published</div>\n' if page.get("draft") else ""
         body = page_template.safe_substitute(
             feature_image=feature_image_html,
             title=html.escape(page["title"]),
-            content_html=page["content_html"],
+            content_html=draft_banner + page["content_html"],
         )
         schema_type = page.get("schema_type", "WebPage")
         json_ld = '<script type="application/ld+json">%s</script>' % json.dumps(
@@ -634,10 +646,11 @@ def main():
                 srcset=srcset_attr(post["feature_image_variants"]),
                 sizes=HERO_IMAGE_SIZES,
             )
+        draft_banner = '<div class="draft-banner">DRAFT &mdash; not published</div>\n' if post.get("draft") else ""
         body = post_template.safe_substitute(
             feature_image=feature_image_html,
             title=html.escape(post["title"]),
-            content_html=post["content_html"],
+            content_html=draft_banner + post["content_html"],
         )
         json_ld = '<script type="application/ld+json">%s</script>' % json.dumps(
             {
@@ -680,7 +693,8 @@ def main():
                 og_type="article",
             ),
         )
-        all_public_urls.append(post["url"])
+        if not post.get("draft"):
+            all_public_urls.append(post["url"])
 
     posts_by_tag = {}
     for post in posts:
@@ -774,6 +788,8 @@ def main():
     latest_updated = max(posts[0]["updated_at"], *(page["updated_at"] for page in pages if page.get("updated_at")))
     feed_entries = []
     for post in posts:
+        if post.get("draft"):
+            continue
         feed_entries.append(
             "<entry><title>{title}</title><link href=\"{url}\"/><updated>{updated}</updated><id>{url}</id>"
             "<content type=\"html\">{content}</content></entry>".format(
@@ -848,11 +864,12 @@ def main():
         "- Home: %s" % absolute_url(site, "/"),
     ]
     for page in pages:
-        if page["url"] != "/404.html":
+        if page["url"] != "/404.html" and not page.get("draft"):
             llms_lines.append("- %s: %s" % (page["title"], absolute_url(site, page["url"])))
     llms_lines.extend(["", "## Posts"])
     for post in posts:
-        llms_lines.append("- %s: %s" % (post["title"], absolute_url(site, post["url"])))
+        if not post.get("draft"):
+            llms_lines.append("- %s: %s" % (post["title"], absolute_url(site, post["url"])))
     write_output("llms.txt", "\n".join(llms_lines) + "\n")
     write_output(
         ".htaccess",
