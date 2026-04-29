@@ -31,6 +31,81 @@ CARD_IMAGE_SIZES = "(max-width: 680px) 92vw, (max-width: 980px) 44vw, 30vw"
 HERO_IMAGE_SIZES = "(max-width: 760px) 92vw, 680px"
 IMAGE_DERIVATIVE_CACHE = {}
 DERIVATIVE_SOURCE_URLS = set()
+NOTE_SHORTCODE_RE = re.compile(r"\[\[note:\s*(?:(?P<label>[^\]|]+?)\s*\|\s*)?(?P<body>.+?)\]\]")
+
+
+class AnnotationRegistry:
+    def __init__(self):
+        self.items = []
+
+    def add(self, body_text, *, label=None):
+        index = len(self.items) + 1
+        note = {
+            "index": index,
+            "label": (label or "").strip() or None,
+            "ref_id": "annotation-ref-%s" % index,
+            "popover_id": "annotation-popover-%s" % index,
+            "note_id": "annotation-note-%s" % index,
+            "body_text": body_text.strip(),
+        }
+        self.items.append(note)
+        return note
+
+    def render_marker(self, note):
+        label_suffix = ": %s" % note["label"] if note.get("label") else ""
+        popover_label = '<span class="annotation-popover-label">%s</span>' % html.escape(note["label"]) if note.get("label") else ""
+        body_html = apply_inline_markup(note["body_text"], allow_notes=False)
+        marker_icon = (
+            '<svg class="annotation-marker-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+            '<path d="M16.862 3.487a2.25 2.25 0 1 1 3.182 3.182L8.31 18.403a4.5 4.5 0 0 1-1.897 1.11l-2.685.895.895-2.685a4.5 4.5 0 0 1 1.11-1.897L16.862 3.487Z"/>'
+            '<path d="M19.5 14.25v3.375A2.625 2.625 0 0 1 16.875 20.25H6.375A2.625 2.625 0 0 1 3.75 17.625V7.125A2.625 2.625 0 0 1 6.375 4.5H9.75"/>'
+            "</svg>"
+        )
+        return (
+            '<span class="annotation-anchor">'
+            '<a href="#{note_id}" class="annotation-marker" id="{ref_id}" aria-label="Open note {index}{label_suffix}" '
+            'aria-controls="{popover_id}" aria-expanded="false" data-annotation-trigger="{index}">{marker_icon}</a>'
+            '<span class="annotation-popover" id="{popover_id}" role="note" aria-labelledby="{ref_id}" hidden>'
+            '<span class="annotation-popover-meta"><span class="annotation-popover-index">{index}</span>{popover_label}</span>'
+            '<span class="annotation-popover-body">{body_html}</span>'
+            '</span></span>'
+        ).format(
+            note_id=note["note_id"],
+            ref_id=note["ref_id"],
+            popover_id=note["popover_id"],
+            index=note["index"],
+            label_suffix=html_attr(label_suffix),
+            popover_label=popover_label,
+            body_html=body_html,
+            marker_icon=marker_icon,
+        )
+
+    def render_section(self):
+        if not self.items:
+            return ""
+
+        items_html = []
+        for note in self.items:
+            label_html = '<div class="annotation-list-label">%s</div>' % html.escape(note["label"]) if note.get("label") else ""
+            body_html = apply_inline_markup(note["body_text"], allow_notes=False)
+            items_html.append(
+                '<li class="annotation-list-item" id="{note_id}">'
+                '<div class="annotation-list-meta"><span class="annotation-list-index">{index}.</span>{label_html}'
+                '<a class="annotation-backlink" href="#{ref_id}" aria-label="Back to note {index}">Back</a></div>'
+                '<div class="annotation-list-body">{body_html}</div></li>'.format(
+                    note_id=note["note_id"],
+                    index=note["index"],
+                    label_html=label_html,
+                    ref_id=note["ref_id"],
+                    body_html=body_html,
+                )
+            )
+
+        return (
+            '<noscript><section class="annotations-section" aria-labelledby="annotations-heading">'
+            '<h2 class="annotations-title" id="annotations-heading">Marginalia</h2>'
+            '<ol class="annotations-list">%s</ol></section></noscript>'
+        ) % "".join(items_html)
 
 
 def load_yaml(path):
@@ -266,8 +341,13 @@ def image_tag(url_path, alt, *, class_name="", loading="lazy", fetchpriority=Non
     return "<img %s>" % " ".join(attrs)
 
 
+def strip_note_shortcodes(text):
+    return NOTE_SHORTCODE_RE.sub("", text)
+
+
 def read_time_minutes(markdown_text):
-    plain = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", markdown_text)
+    plain = strip_note_shortcodes(markdown_text)
+    plain = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", plain)
     plain = re.sub(r"\[[^\]]+\]\([^)]+\)", "", plain)
     plain = re.sub(r"[#>*_`-]", " ", plain)
     words = [word for word in plain.split() if word]
@@ -275,22 +355,33 @@ def read_time_minutes(markdown_text):
 
 
 def excerpt_from_markdown(markdown_text, limit=220):
-    rendered = strip_tags(render_markdown(markdown_text))
+    rendered = strip_tags(render_markdown(strip_note_shortcodes(markdown_text)))
     rendered = re.sub(r"\s+", " ", rendered).strip()
     if len(rendered) <= limit:
         return rendered
     return rendered[: limit - 1].rsplit(" ", 1)[0] + "…"
 
 
-def apply_inline_markup(text):
+def apply_inline_markup(text, annotation_registry=None, allow_notes=True):
     code_spans = []
 
     def store_code(match):
         code_spans.append("<code>%s</code>" % html.escape(match.group(1)))
         return "@@CODE%s@@" % (len(code_spans) - 1)
 
-    text = html.escape(text)
     text = re.sub(r"`([^`]+)`", store_code, text)
+
+    if allow_notes and annotation_registry:
+        note_tokens = []
+
+        def store_note(match):
+            note = annotation_registry.add(match.group("body"), label=match.group("label"))
+            note_tokens.append(annotation_registry.render_marker(note))
+            return "@@NOTE%s@@" % (len(note_tokens) - 1)
+
+        text = NOTE_SHORTCODE_RE.sub(store_note, text)
+
+    text = html.escape(text)
 
     def replace_image(match):
         alt, src = match.groups()
@@ -309,10 +400,13 @@ def apply_inline_markup(text):
     text = re.sub(r"(?<!_)_([^_]+)_(?!_)", r"<em>\1</em>", text)
     for index, code_html in enumerate(code_spans):
         text = text.replace("@@CODE%s@@" % index, code_html)
+    if allow_notes and annotation_registry:
+        for index, note_html in enumerate(note_tokens):
+            text = text.replace("@@NOTE%s@@" % index, note_html)
     return text
 
 
-def render_markdown(markdown_text):
+def render_markdown(markdown_text, annotation_registry=None):
     markdown_text = preprocess_markdown(markdown_text)
     blocks = []
     current = []
@@ -367,7 +461,7 @@ def render_markdown(markdown_text):
         heading = re.match(r"^(#{1,6})\s+(.*)$", first)
         if heading and len(lines) == 1:
             level = len(heading.group(1))
-            rendered.append("<h%s>%s</h%s>" % (level, apply_inline_markup(heading.group(2).strip()), level))
+            rendered.append("<h%s>%s</h%s>" % (level, apply_inline_markup(heading.group(2).strip(), annotation_registry=annotation_registry), level))
             continue
 
         image_only = re.match(r"^!\[([^\]]*)\]\(([^)]+)\)$", first)
@@ -388,11 +482,11 @@ def render_markdown(markdown_text):
 
         if all(line.strip().startswith(">") for line in lines):
             quote_text = " ".join(line.strip()[1:].strip() for line in lines)
-            rendered.append("<blockquote><p>%s</p></blockquote>" % apply_inline_markup(quote_text))
+            rendered.append("<blockquote><p>%s</p></blockquote>" % apply_inline_markup(quote_text, annotation_registry=annotation_registry))
             continue
 
         paragraph = " ".join(line.strip() for line in lines)
-        rendered.append("<p>%s</p>" % apply_inline_markup(paragraph))
+        rendered.append("<p>%s</p>" % apply_inline_markup(paragraph, annotation_registry=annotation_registry))
 
     return "".join(rendered)
 
@@ -514,7 +608,9 @@ def main():
         page["published_at"] = parse_date(page.get("date"))
         page["updated_at"] = parse_date(page.get("updated")) or page["published_at"]
         page["excerpt"] = page.get("excerpt") or excerpt_from_markdown(page["body_markdown"])
-        page["content_html"] = render_markdown(page["body_markdown"])
+        page_annotations = AnnotationRegistry()
+        page["content_html"] = render_markdown(page["body_markdown"], annotation_registry=page_annotations)
+        page["annotations_html"] = page_annotations.render_section()
         page["feature_image_variants"] = ensure_image_variant_set(page.get("feature_image"), "feature", FEATURE_VARIANT_WIDTHS) if page.get("feature_image") else []
         page["feature_image_optimized"] = page["feature_image_variants"][-1]["url"] if page["feature_image_variants"] else ""
         page["kind"] = "page"
@@ -533,7 +629,9 @@ def main():
         post["updated_at"] = parse_date(post.get("updated")) or post["published_at"]
         post["excerpt"] = post.get("excerpt") or excerpt_from_markdown(post["body_markdown"])
         post["reading_time"] = read_time_minutes(post["body_markdown"])
-        post["content_html"] = render_markdown(post["body_markdown"])
+        post_annotations = AnnotationRegistry()
+        post["content_html"] = render_markdown(post["body_markdown"], annotation_registry=post_annotations)
+        post["annotations_html"] = post_annotations.render_section()
         post["feature_image_variants"] = ensure_image_variant_set(post.get("feature_image"), "feature", FEATURE_VARIANT_WIDTHS) if post.get("feature_image") else []
         post["feature_image_optimized"] = post["feature_image_variants"][-1]["url"] if post["feature_image_variants"] else ""
         post["kind"] = "post"
@@ -594,6 +692,7 @@ def main():
             feature_image=feature_image_html,
             title=html.escape(page["title"]),
             content_html=draft_banner + page["content_html"],
+            annotations_html=page["annotations_html"],
         )
         schema_type = page.get("schema_type", "WebPage")
         json_ld = '<script type="application/ld+json">%s</script>' % json.dumps(
@@ -651,6 +750,7 @@ def main():
             feature_image=feature_image_html,
             title=html.escape(post["title"]),
             content_html=draft_banner + post["content_html"],
+            annotations_html=post["annotations_html"],
         )
         json_ld = '<script type="application/ld+json">%s</script>' % json.dumps(
             {

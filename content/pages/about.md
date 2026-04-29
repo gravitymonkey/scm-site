@@ -9,7 +9,7 @@ excerpt: "I have a confession that will resonate with anyone who has spent time 
 ---
 ![monkey playing the piano](/assets/images/of4Vf-monkey-playing-bach.png)
 
-I have a confession that will resonate with anyone who has spent time doing software engineering: for most of the history of the profession, the bottleneck was me. Well, not just me, I mean more like us, the humans. Specifically, the painful, glorious slowness with which humans write and read code — line by line, review by review, architecture debate by architecture debate, tabs versus spaces (tabs, ffs, always).
+I have a confession that will resonate with anyone who has spent time doing software engineering: for most of the history of the profession, the bottleneck was me. Well, not just me, I mean more like us, the humans. Specifically, the painful, glorious slowness with which humans write and read code — line by line, review by review, architecture debate by architecture debate, tabs versus spaces[[note: Pedantry | This is not a joke. It is one of the oldest and least productive holy wars in software, and yet somehow it keeps finding oxygen.]] (tabs, ffs, always).
 
 It become so much a part of the culture that many of the coder humans that grew into management felt that slowing everything down was the primary task. That friction was annoying. Sometimes product-hurting or company-killing.
 
