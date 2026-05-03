@@ -12,6 +12,9 @@
 .annotation-popover-index{display:inline-flex;align-items:center;justify-content:center;min-width:1.8rem;height:1.8rem;border-radius:999px;background:#ffedd7;color:#8d4d00;font-size:1.05rem;font-weight:700}
 .annotation-popover-label{font-size:1.1rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#8d4d00}
 .annotation-popover-body{display:block}
+.annotation-popover-body a,.annotation-list-body a{color:#187fb6;text-decoration:underline;text-decoration-thickness:.08em;text-underline-offset:.18em}
+.annotation-popover-body a:hover,.annotation-list-body a:hover{color:#0f5f8a}
+.annotation-popover-body img,.annotation-list-body img{display:block;max-width:100%;margin:.8rem 0;border-radius:.4rem}
 .annotation-anchor[data-open=true] .annotation-marker{color:#7b3d00}
 .annotations-section{margin:4.5rem 0 0 0;padding:2.4rem 0 0 0;border-top:1px solid rgba(91,122,129,.28)}
 .annotations-title{margin:0 0 1.4rem 0;font-size:2.2rem}

@@ -31,7 +31,7 @@ CARD_IMAGE_SIZES = "(max-width: 680px) 92vw, (max-width: 980px) 44vw, 30vw"
 HERO_IMAGE_SIZES = "(max-width: 760px) 92vw, 680px"
 IMAGE_DERIVATIVE_CACHE = {}
 DERIVATIVE_SOURCE_URLS = set()
-NOTE_SHORTCODE_RE = re.compile(r"\[\[note:\s*(?:(?P<label>[^\]|]+?)\s*\|\s*)?(?P<body>.+?)\]\]")
+NOTE_SHORTCODE_RE = re.compile(r"\[\[note:\s*(?:(?P<label>[^\]|]*?)\s*\|\s*)?(?P<body>.+?)\]\]")
 
 
 class AnnotationRegistry:
@@ -319,7 +319,19 @@ def preprocess_markdown(markdown_text):
     return re.sub(r'<img\b[^>]*\bsrc="([^"]+)"[^>]*>', optimize_html_img_tag, markdown_text)
 
 
-def image_tag(url_path, alt, *, class_name="", loading="lazy", fetchpriority=None, decoding="async", srcset=None, sizes=None):
+def image_tag(
+    url_path,
+    alt,
+    *,
+    class_name="",
+    loading="lazy",
+    fetchpriority=None,
+    decoding="async",
+    srcset=None,
+    sizes=None,
+    width=None,
+    height=None,
+):
     attrs = [
         'src="%s"' % html_attr(url_path),
         'alt="%s"' % html_attr(alt),
@@ -335,10 +347,36 @@ def image_tag(url_path, alt, *, class_name="", loading="lazy", fetchpriority=Non
         attrs.append('srcset="%s"' % html_attr(srcset))
     if sizes:
         attrs.append('sizes="%s"' % html_attr(sizes))
-    dims = image_dimension_attrs(url_path)
-    if dims:
-        attrs.append(dims.strip())
+    if width:
+        attrs.append('width="%s"' % html_attr(str(width)))
+    if height:
+        attrs.append('height="%s"' % html_attr(str(height)))
+    if width or height:
+        style_parts = []
+        if width:
+            style_parts.append("width:%spx" % width)
+        if height:
+            style_parts.append("height:%spx" % height)
+        attrs.append('style="%s"' % html_attr(";".join(style_parts)))
+    else:
+        dims = image_dimension_attrs(url_path)
+        if dims:
+            attrs.append(dims.strip())
     return "<img %s>" % " ".join(attrs)
+
+
+def parse_image_attrs(attr_text):
+    if not attr_text:
+        return {}
+
+    parsed = {}
+    for key, value in re.findall(r'\b(width|height)\s*=\s*"?(\d{1,4})"?', attr_text):
+        parsed[key] = int(value)
+    return parsed
+
+
+def strip_markdown_image_attrs(text):
+    return re.sub(r"(!\[[^\]]*\]\([^)]+\))\{[^}]*\}", r"\1", text)
 
 
 def strip_note_shortcodes(text):
@@ -347,6 +385,7 @@ def strip_note_shortcodes(text):
 
 def read_time_minutes(markdown_text):
     plain = strip_note_shortcodes(markdown_text)
+    plain = strip_markdown_image_attrs(plain)
     plain = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", plain)
     plain = re.sub(r"\[[^\]]+\]\([^)]+\)", "", plain)
     plain = re.sub(r"[#>*_`-]", " ", plain)
@@ -384,15 +423,16 @@ def apply_inline_markup(text, annotation_registry=None, allow_notes=True):
     text = html.escape(text)
 
     def replace_image(match):
-        alt, src = match.groups()
-        optimized_url = ensure_image_derivative(src, "inline")
-        return image_tag(optimized_url, alt, loading="lazy")
+        alt, src, attr_text = match.groups()
+        image_attrs = parse_image_attrs(attr_text)
+        optimized_url = ensure_image_derivative(src, "inline", width=image_attrs.get("width"))
+        return image_tag(optimized_url, alt, loading="lazy", width=image_attrs.get("width"), height=image_attrs.get("height"))
 
     def replace_link(match):
         label, href = match.groups()
         return '<a href="%s">%s</a>' % (href, label)
 
-    text = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", replace_image, text)
+    text = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]*)\})?", replace_image, text)
     text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", replace_link, text)
     text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"__([^_]+)__", r"<strong>\1</strong>", text)

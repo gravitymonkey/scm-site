@@ -7,7 +7,7 @@ tags:
 date: 2026-04-04T00:00:00+00:00
 updated: 2026-04-04T00:00:00+00:00
 feature_image: /assets/images/monks.png
-excerpt: "Now that writing code is cheap, you can plan in prototypes -- but only if you're honest about what a prototype is: It's a planning tool that happens to look like a product."
+excerpt: "Don't wallow in planning, plan in prototypes: What To Do When Code Is Free."
 ---
 
 That moment in a leadership meeting when I started to say, "Well, if you recall Frederick Brooks..." -- I realized I was probably already screwed.

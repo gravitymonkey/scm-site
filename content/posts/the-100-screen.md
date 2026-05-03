@@ -5,9 +5,9 @@ author: jason
 tags:
   - field-notes
 date: 2026-04-27T16:33:53+00:00
-updated: 2026-04-27T16:33:53+00:00
+updated: 2026-05-03T22:33:53+00:00
 feature_image: /assets/images/flag.png
-excerpt: "We used to call that move from deterministic tasks to managerial ambiguity career growth. AI just made opting out of it no longer an option."
+excerpt: "AI and automation moves people into ambiguous, judgment-heavy work where success is fuzzier and the unspoken norms even more important."
 ---
 
 Developers will tell you they love solving problems. What we rarely admit -- and what I suspect we don't always fully know -- is that we love solving problems the way a completionist loves a video game: only if there's a 100% screen waiting at the end. The rest of it, we merely endure.
@@ -22,7 +22,7 @@ There's something deeper in problem-solving than merely finishing. It's the feel
 
 Working in software development is a similar experience to most knowledge work.  Take Finance: The spreadsheet reconciles, the document gets sent, the contract is signed. When we complete a task, we feel a certain dignity. Closure isn't a perk of good work -- it's part of what makes digital work feel like it happened at all.
 
-And then the asteroid hits.
+And then the asteroid hits[[note: Boom | ![flag](/assets/reddit_stack.webp){width=500}]].
 
 AI arrives -- carrying confident language and the subtle menace of a forklift in a pottery store, driven by drunken capital looking for efficiencies to automate. And the cruel irony is that the work easiest to automate, the work we sometimes get the most joy from, is the work with the clearest structure. Clean inputs, clean outputs, a sharp notion of done is AI's strong suit, robbing task-oriented humans of this simple joy.
 
@@ -50,5 +50,5 @@ What's changed is how much of my work actually behaves that way. More of it now 
 
 <HR>
 	
-Originally published in Dave Bethoney's [The Revive](https://therevive.substack.com/subscribe?)
+Originally published in Dave Bethoney's [The Revive](https://therevive.substack.com/p/the-100-screen)
 
